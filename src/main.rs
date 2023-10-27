@@ -16,7 +16,7 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
         let string = &encoded_value[colon_index + 1..colon_index + 1 + number as usize];
         return serde_json::Value::String(string.to_string());
     } else {
-        let number: i32 = encoded_value[1..encoded_value.len() - 1].parse().unwrap();
+        let number: i64 = encoded_value[1..encoded_value.len() - 1].parse().unwrap();
         return serde_json::Value::Number(Number::from(number));
     }
 }
