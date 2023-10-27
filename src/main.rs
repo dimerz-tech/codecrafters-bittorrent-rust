@@ -1,5 +1,6 @@
 use serde_json;
 use std::env;
+use serde_json::Number;
 
 // Available if you need it!
 // use serde_bencode
@@ -16,7 +17,7 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
         return serde_json::Value::String(string.to_string());
     } else {
         let number: i32 = encoded_value[1..encoded_value.len() - 1].parse().unwrap();
-        return serde_json::Value::String(number.to_string());
+        return serde_json::Value::Number(Number::from(number));
     }
 }
 
