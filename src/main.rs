@@ -1,8 +1,6 @@
 use serde_json;
 use std::env;
-use serde::Serialize;
 use serde_bencode;
-use serde_bytes;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
@@ -13,11 +11,12 @@ fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
             serde_json::Value::Number(serde_json::value::Number::from(int))
         },
         serde_bencode::value::Value::List(list) => {
-            let mut arr: Vec<serde_json::Value> = vec![];
-            for el in list {
-                arr.push(bencode_to_serde(el))
-            }
-            serde_json::Value::Array(arr)
+            // let mut arr: Vec<serde_json::Value> = vec![];
+            // for el in list {
+            //     arr.push(bencode_to_serde(el))
+            // }
+            // serde_json::Value::Array(arr)
+            serde_json::Value::Array(list.into_iter().map(|el| bencode_to_serde(el)).collect())
         },
         serde_bencode::value::Value::Dict(dict) => {
             let mut map: serde_json::Map<String, serde_json::Value> = serde_json::map::Map::new();
