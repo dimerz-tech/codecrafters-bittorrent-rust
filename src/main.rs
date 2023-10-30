@@ -38,6 +38,7 @@ struct MetaInfo {
 struct Info {
     length: usize,
     name: String,
+    #[serde(rename = "piece length")]
     piece_length: usize,
     pieces: serde_bytes::ByteBuf
 }
