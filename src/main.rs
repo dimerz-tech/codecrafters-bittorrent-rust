@@ -1,7 +1,8 @@
 use std::env;
 use serde_json;
 use serde_bencode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sha1::{Sha1, Digest};
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
@@ -34,7 +35,7 @@ struct MetaInfo {
     info: Info
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Info {
     length: usize,
     name: String,
@@ -54,10 +55,15 @@ fn main() {
     } else if command == "info" {
         let file_path =  &args[2];
         let buf = std::fs::read(file_path).unwrap();
+        let mut hasher = Sha1::new();
         match serde_bencode::de::from_bytes::<MetaInfo>(&buf) {
             Ok(torrent) => {
+                let bytes = serde_bencode::to_bytes(&torrent.info).unwrap();
+                hasher.update(bytes);
+                let hash = hasher.finalize();
                 println!("Tracker URL: {}", torrent.announce);
                 println!("Length: {}", torrent.info.length);
+                println!("Info Hash: {:?}", hash);
             },
             Err(e) => {
                 println!("Error: {}", e.to_string());
