@@ -7,7 +7,7 @@ use serde_bytes;
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
         serde_bencode::value::Value::Bytes(bytes) => {
-            serde_json::Value::String(String::from_utf8_lossy(bytes.as_slice()).parse().unwrap())
+            serde_json::Value::String(String::from_utf8_lossy(bytes.as_slice()).to_string())
         },
         serde_bencode::value::Value::Int(int) => {
             serde_json::Value::Number(serde_json::value::Number::from(int))
@@ -19,7 +19,13 @@ fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
             }
             serde_json::Value::Array(arr)
         },
-        _ => {serde_json::Value::String("Not implemented".to_string())}
+        serde_bencode::value::Value::Dict(dict) => {
+            let mut map: serde_json::Map<String, serde_json::Value> = serde_json::map::Map::new();
+            for el in dict {
+                map.insert(String::from_utf8_lossy(el.0.as_slice()).to_string(), bencode_to_serde(el.1));
+            }
+            serde_json::Value::Object(map)
+        }
     }
 }
 
