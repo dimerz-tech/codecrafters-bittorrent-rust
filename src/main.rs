@@ -63,7 +63,7 @@ fn main() {
                 let hash = hasher.finalize();
                 println!("Tracker URL: {}", torrent.announce);
                 println!("Length: {}", torrent.info.length);
-                println!("Info Hash: {:?}", hash);
+                println!("Info Hash: {:x}", hash);
             },
             Err(e) => {
                 println!("Error: {}", e.to_string());
