@@ -54,7 +54,7 @@ fn main() {
     } else if command == "info" {
         let file_path =  &args[2];
         let buf = std::fs::read(file_path).unwrap();
-        let torrent: MetaInfo = serde_bencode::from_bytes(buf.as_slice()).unwrap();
+        let torrent = serde_bencode::de::from_bytes::<MetaInfo>(&buf).unwrap();
         println!("Tracker URL: {}", String::from_utf8_lossy(torrent.announce.as_slice()));
         println!("Length: {}", torrent.info.length);
     }
