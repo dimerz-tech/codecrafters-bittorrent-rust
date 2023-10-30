@@ -1,12 +1,14 @@
 use serde_json;
 use std::env;
+use serde::Serialize;
 use serde_json::{Number, Value};
 use serde_bencode;
 
 
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
-    serde_bencode::de::from_bytes(encoded_value.as_ref()).unwrap()
+    let ben_val: Value = serde_bencode::from_str(encoded_value).unwrap();
+    ben_val.to_string().serialize().unwrap()
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
