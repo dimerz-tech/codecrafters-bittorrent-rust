@@ -1,6 +1,7 @@
-use serde_json;
 use std::env;
+use serde_json;
 use serde_bencode;
+use serde::Deserialize;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
@@ -11,19 +12,11 @@ fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
             serde_json::Value::Number(serde_json::value::Number::from(int))
         },
         serde_bencode::value::Value::List(list) => {
-            // let mut arr: Vec<serde_json::Value> = vec![];
-            // for el in list {
-            //     arr.push(bencode_to_serde(el))
-            // }
-            // serde_json::Value::Array(arr)
             serde_json::Value::Array(list.into_iter().map(|el| bencode_to_serde(el)).collect())
         },
         serde_bencode::value::Value::Dict(dict) => {
-            let mut map: serde_json::Map<String, serde_json::Value> = serde_json::map::Map::new();
-            for el in dict {
-                map.insert(String::from_utf8_lossy(el.0.as_slice()).to_string(), bencode_to_serde(el.1));
-            }
-            serde_json::Value::Object(map)
+            serde_json::Value::Object(dict.into_iter().map(|el|
+                (String::from_utf8_lossy(el.0.as_slice()).to_string(), bencode_to_serde(el.1))).collect())
         }
     }
 }
@@ -35,6 +28,21 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     bencode_to_serde(value)
 }
 
+#[derive(Debug, Deserialize)]
+struct MetaInfo {
+    announce: Vec<u8>,
+    info: Info
+
+}
+
+#[derive(Debug, Deserialize)]
+struct Info {
+    length: i64,
+    name: Vec<u8>,
+    piece: i64,
+    pieces: serde_bytes::ByteBuf
+}
+
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -43,7 +51,14 @@ fn main() {
         let encoded_value = &args[2];
         let decoded_value = decode_bencoded_value(encoded_value);
         println!("{}", decoded_value);
-    } else {
+    } else if command == "info" {
+        let file_path =  &args[2];
+        let buf = std::fs::read(file_path).unwrap();
+        let torrent: MetaInfo = serde_bencode::from_bytes(buf.as_slice()).unwrap();
+        println!("Tracker URL: {}", String::from_utf8_lossy(torrent.announce.as_slice()));
+        println!("Length: {}", torrent.info.length);
+    }
+    else {
         println!("unknown command: {}", args[1])
     }
 }
