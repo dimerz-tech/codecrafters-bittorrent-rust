@@ -7,7 +7,7 @@ use serde_bencode;
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     println!("{}", encoded_value);
-    serde_bencode::from_str(encoded_value).unwrap()
+    serde_bencode::from_str(&encoded_value.to_string()).unwrap()
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
