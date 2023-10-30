@@ -65,8 +65,9 @@ fn main() {
                 println!("Length: {}", torrent.info.length);
                 println!("Info Hash: {:x}", hash);
                 println!("Piece Length: {}", torrent.info.piece_length);
-                for piece in torrent.info.pieces {
-                    println!("{}", piece.to_string());
+                let chunks: Vec<&[u8]> = torrent.info.pieces.as_ref().chunks(20).collect();
+                for chunk in chunks {
+                    println!("{}", hex::encode(chunk));
                 }
             },
             Err(e) => {
