@@ -30,15 +30,15 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
 
 #[derive(Debug, Deserialize)]
 struct MetaInfo {
-    announce: Vec<u8>,
+    announce: String,
     info: Info
 }
 
 #[derive(Debug, Deserialize)]
 struct Info {
-    length: i64,
-    name: Vec<u8>,
-    piece: i64,
+    length: usize,
+    name: String,
+    piece_length: usize,
     pieces: serde_bytes::ByteBuf
 }
 
