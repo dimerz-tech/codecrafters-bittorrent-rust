@@ -55,7 +55,7 @@ fn main() {
         let buf = std::fs::read(file_path).unwrap();
         match serde_bencode::de::from_bytes::<MetaInfo>(&buf) {
             Ok(torrent) => {
-                println!("Tracker URL: {}", String::from_utf8_lossy(torrent.announce.as_slice()));
+                println!("Tracker URL: {}", torrent.announce);
                 println!("Length: {}", torrent.info.length);
             },
             Err(e) => {
