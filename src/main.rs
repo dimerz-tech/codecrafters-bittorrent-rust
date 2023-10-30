@@ -10,7 +10,6 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     let value = serde_bencode::from_str(encoded_value).unwrap();
     match value {
         serde_bencode::value::Value::Bytes(bytes) => {
-            println!("Value {:?}", bytes);
             serde_json::Value::String(String::from_utf8_lossy(bytes.as_slice()).parse().unwrap())
         },
         serde_bencode::value::Value::Int(int) => {
