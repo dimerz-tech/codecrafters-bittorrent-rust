@@ -32,7 +32,6 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
 struct MetaInfo {
     announce: Vec<u8>,
     info: Info
-
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,9 +53,15 @@ fn main() {
     } else if command == "info" {
         let file_path =  &args[2];
         let buf = std::fs::read(file_path).unwrap();
-        let torrent = serde_bencode::de::from_bytes::<MetaInfo>(&buf).unwrap();
-        println!("Tracker URL: {}", String::from_utf8_lossy(torrent.announce.as_slice()));
-        println!("Length: {}", torrent.info.length);
+        match serde_bencode::de::from_bytes::<MetaInfo>(&buf) {
+            Ok(torrent) => {
+                println!("Tracker URL: {}", String::from_utf8_lossy(torrent.announce.as_slice()));
+                println!("Length: {}", torrent.info.length);
+            },
+            Err(e) => {
+                println!("Error: {}", e.to_string());
+            }
+        }
     }
     else {
         println!("unknown command: {}", args[1])
