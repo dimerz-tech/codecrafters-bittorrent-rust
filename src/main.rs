@@ -5,8 +5,17 @@ use serde_bencode;
 
 
 #[allow(dead_code)]
-fn decode_bencoded_value(encoded_value: &str) -> serde_bencode::value::Value {
-    serde_bencode::from_str(encoded_value).unwrap()
+fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
+    let value = serde_bencode::from_str(encoded_value).unwrap();
+    match value {
+        serde_bencode::value::Value::Bytes(bytes) => {
+            serde_json::from_slice(bytes.as_slice()).unwrap()
+        },
+        serde_bencode::value::Value::Int(int) => {
+            serde_json::Value::Number(serde_json::value::Number::from(int))
+        },
+        _ => {serde_json::Value::String("Not implemented".to_string())}
+    }
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
@@ -16,7 +25,7 @@ fn main() {
     if command == "decode" {
         let encoded_value = &args[2];
         let decoded_value = decode_bencoded_value(encoded_value);
-        println!("{}",  decoded_value.try_into().unwrap());
+        println!("{}", decoded_value);
     } else {
         println!("unknown command: {}", args[1])
     }
