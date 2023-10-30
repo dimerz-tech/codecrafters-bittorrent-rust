@@ -64,6 +64,10 @@ fn main() {
                 println!("Tracker URL: {}", torrent.announce);
                 println!("Length: {}", torrent.info.length);
                 println!("Info Hash: {:x}", hash);
+                println!("Piece Length: {}", torrent.info.piece_length);
+                for piece in torrent.info.pieces {
+                    println!("{}", piece.to_string());
+                }
             },
             Err(e) => {
                 println!("Error: {}", e.to_string());
