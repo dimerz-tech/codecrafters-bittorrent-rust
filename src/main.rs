@@ -2,6 +2,7 @@ use serde_json;
 use std::env;
 use serde::Serialize;
 use serde_bencode;
+use serde_bytes;
 
 
 #[allow(dead_code)]
@@ -9,7 +10,8 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     let value = serde_bencode::from_str(encoded_value).unwrap();
     match value {
         serde_bencode::value::Value::Bytes(bytes) => {
-            serde_json::from_slice(bytes.as_slice()).unwrap()
+            println!("Value {:?}", bytes);
+            serde_json::Value::String(String::from_utf8_lossy(bytes.as_slice()).parse().unwrap())
         },
         serde_bencode::value::Value::Int(int) => {
             serde_json::Value::Number(serde_json::value::Number::from(int))
