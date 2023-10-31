@@ -92,15 +92,14 @@ async fn main() {
     } else if command == "peers" {
         let file_path =  &args[2];
         let torrent = Torrent::new(file_path);
-        let info_hash: String = serde_urlencoded::from_str(format!("{:x}", torrent.hash).as_str()).unwrap();
         let peer_id = "00112233445566778899";
         let port = 6881;
         let uploaded = 0;
         let downloaded = 0;
         let left = torrent.meta.info.length;
         let compact = 1;
-        let url = format!("{}?info_hash={info_hash}&peer_id={peer_id}&port={port}&\
-        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce);
+        let url = format!("{}?info_hash={:x}&peer_id={peer_id}&port={port}&\
+        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, torrent.hash);
         println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
         let body = res.text().await.unwrap();
