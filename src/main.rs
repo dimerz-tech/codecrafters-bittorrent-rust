@@ -1,5 +1,8 @@
+extern crate core;
+
 use std::collections::HashMap;
 use std::env;
+use std::io::Read;
 use serde_json;
 use serde_bencode;
 use serde::{Deserialize, Serialize};
@@ -7,6 +10,8 @@ use sha1::{Sha1, Digest, Sha1Core};
 use sha1::digest::Output;
 use serde_urlencoded;
 use hex;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 use u16;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
@@ -60,6 +65,7 @@ pub struct Response {
     pub peers: Vec<u8>,
 }
 
+#[derive(Debug, Deserialize)]
 struct Torrent {
     meta: MetaInfo,
     hash: [u8; 20]
@@ -75,6 +81,57 @@ impl Torrent {
         let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
         Torrent { meta, hash }
     }
+}
+
+async fn handshake(peer: &str, hash: [u8; 20]) {
+    let listener = TcpListener::bind(peer).await.unwrap();
+    while let Ok((mut socket, _)) = listener.accept().await {
+        tokio::spawn(async move {
+            hello(socket, hash).await
+        });
+    }
+}
+
+struct HandShake {
+    proto_len: [u8; 1],
+    bit_torrent_str: [u8; 10],
+    zeros: [u8; 8],
+    sha1_info_hash: [u8; 20],
+    peer_id: [u8; 20],
+}
+
+impl HandShake {
+    fn new(hash: [u8; 20]) -> Self {
+        let proto_len: [u8; 1] = [19];
+        let bit_torrent_str: [u8; 10] = "BitTorrent protocol".as_bytes().try_into().unwrap();
+        let zeros: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+        let sha1_info_hash = hash;
+        let peer_id: [u8; 20] = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9];
+        HandShake {proto_len, bit_torrent_str, zeros, sha1_info_hash, peer_id}
+    }
+}
+
+impl From<[u8; 59]> for HandShake {
+    fn from(value: [u8; 59]) -> Self {
+        let mut hand_shake = HandShake::new([0u8; 20]);
+        hand_shake.peer_id.clone_from_slice(&value[39..]);
+        hand_shake
+    }
+}
+
+async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
+    let client_hello = HandShake::new(hash.clone());
+    let hello_req = [client_hello.proto_len.as_slice(),
+        client_hello.bit_torrent_str.as_slice(),
+        client_hello.bit_torrent_str.as_slice(),
+        client_hello.zeros.as_slice(),
+        client_hello.sha1_info_hash.as_slice(),
+        client_hello.peer_id.as_slice()].concat();
+    stream.write_all(hello_req.as_slice()).await.unwrap();
+    let mut buf = [0u8; 59];
+    stream.read_exact(&mut buf).await.unwrap();
+    let peer_hello = HandShake::from(buf);
+    println!("Peer ID: {:?}", peer_hello.peer_id);
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
@@ -119,6 +176,10 @@ async fn main() {
                                 peer[3].to_string(),
                                 u16::from_be_bytes([peer[4].clone(), peer[5].clone()]))).collect();
         println!("{:?}", peers);
+    } else if command == "handshake" {
+        let file_path =  &args[2];
+        let torrent = Torrent::new(file_path);
+        let peer = &args[3];
     }
     else {
         println!("unknown command: {}", args[1])
