@@ -112,7 +112,13 @@ async fn main() {
         println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
         let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
-        println!("Response {:?}", resp);
+        let peers: Vec<String> = resp.peers.chunks(6)
+            .map(|peer| format!("{}.{}.{}.{}:{}", peer[0].to_string(),
+                                peer[1].to_string(),
+                                peer[2].to_string(),
+                                peer[3].to_string(),
+                String::from_utf8_lossy(&peer[4..]))).collect();
+        println!("{:?}", peers);
     }
     else {
         println!("unknown command: {}", args[1])
