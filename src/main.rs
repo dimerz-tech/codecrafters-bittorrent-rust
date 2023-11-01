@@ -117,7 +117,7 @@ async fn main() {
                                 peer[1].to_string(),
                                 peer[2].to_string(),
                                 peer[3].to_string(),
-                String::from_utf8_lossy(&peer[4..]).to_string())).collect();
+                String::from_utf8_lossy(&peer[4..=5]).to_string())).collect();
         println!("{:?}", peers);
     }
     else {
