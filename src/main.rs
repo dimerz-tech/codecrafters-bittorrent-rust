@@ -1,6 +1,7 @@
 extern crate core;
 
 use std::env;
+use std::net::ToSocketAddrs;
 use serde_json;
 use serde_bencode;
 use serde::{Deserialize, Serialize};
@@ -80,7 +81,8 @@ impl Torrent {
 }
 
 async fn handshake(peer: &str, hash: [u8; 20]) {
-    println!("Peer {}", peer);
+    let addr = peer.to_socket_addrs().unwrap().next().unwrap();
+    println!("Peer {}", addr);
     let listener = TcpListener::bind(peer).await.unwrap();
     while let Ok((socket, _)) = listener.accept().await {
         tokio::spawn(async move {
