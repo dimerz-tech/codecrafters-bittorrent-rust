@@ -80,6 +80,7 @@ impl Torrent {
 }
 
 async fn handshake(peer: &str, hash: [u8; 20]) {
+    println!("Peer {}", peer);
     let listener = TcpListener::bind(peer).await.unwrap();
     while let Ok((socket, _)) = listener.accept().await {
         tokio::spawn(async move {
@@ -87,7 +88,7 @@ async fn handshake(peer: &str, hash: [u8; 20]) {
         });
     }
 }
-//
+
 struct HandShake {
     proto_len: [u8; 1],
     bit_torrent_str: [u8; 10],
