@@ -87,7 +87,7 @@ async fn handshake(peer: &str, hash: [u8; 20]) {
         });
     }
 }
-
+//
 struct HandShake {
     proto_len: [u8; 1],
     bit_torrent_str: [u8; 10],
