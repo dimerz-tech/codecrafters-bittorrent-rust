@@ -48,7 +48,7 @@ struct Info {
     pieces: serde_bytes::ByteBuf
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Response {
     pub complete: usize,
     pub incomplete: usize,
@@ -56,13 +56,7 @@ pub struct Response {
     #[serde(rename = "min interval")]
     pub min_interval: usize,
     #[serde(with = "serde_bytes")]
-    pub peers: Vec<Peer>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Peer {
-    ip: [u8; 4],
-    port: [u8; 2]
+    pub peers: Vec<u8>,
 }
 
 struct Torrent {
