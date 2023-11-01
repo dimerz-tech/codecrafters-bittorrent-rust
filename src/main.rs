@@ -7,6 +7,7 @@ use sha1::{Sha1, Digest, Sha1Core};
 use sha1::digest::Output;
 use serde_urlencoded;
 use hex;
+use u16;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
@@ -109,7 +110,6 @@ async fn main() {
             collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
         let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
         uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, info_hash);
-        println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
         let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
         let peers: Vec<String> = resp.peers.chunks(6)
@@ -117,7 +117,7 @@ async fn main() {
                                 peer[1].to_string(),
                                 peer[2].to_string(),
                                 peer[3].to_string(),
-                String::from_utf8_lossy(&peer[4..=5]).to_string())).collect();
+                                u16::from_be_bytes([peer[4].clone(), peer[5].clone()]))).collect();
         println!("{:?}", peers);
     }
     else {
