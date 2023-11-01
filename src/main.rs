@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use serde_json;
 use serde_bencode;
@@ -45,6 +46,17 @@ struct Info {
     #[serde(rename = "piece length")]
     piece_length: usize,
     pieces: serde_bytes::ByteBuf
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Response {
+    pub complete: usize,
+    pub incomplete: usize,
+    pub interval: usize,
+    #[serde(rename = "min interval")]
+    pub min_interval: usize,
+    #[serde(with = "serde_bytes")]
+    pub peers: Vec<Peer>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,10 +117,8 @@ async fn main() {
         uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, info_hash);
         println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
-        let body = res.text().await.unwrap();
-        println!("Response {}", body);
-        let peers = serde_bencode::de::from_str::<Vec<String>>(body.as_str()).unwrap();
-        println!("{:?}", peers);
+        let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
+        println!("Response {:?}", resp);
     }
     else {
         println!("unknown command: {}", args[1])
