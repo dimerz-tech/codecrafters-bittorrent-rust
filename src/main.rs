@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha1::{Sha1, Digest, Sha1Core};
 use sha1::digest::Output;
 use serde_urlencoded;
+use hex;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
@@ -54,7 +55,7 @@ struct Peer {
 
 struct Torrent {
     meta: MetaInfo,
-    hash: Output<Sha1Core>
+    hash: [u8; 20]
 }
 
 impl Torrent {
@@ -64,7 +65,7 @@ impl Torrent {
         let meta =  serde_bencode::de::from_bytes::<MetaInfo>(&buf).unwrap();
         let bytes = serde_bencode::to_bytes(&meta.info).unwrap();
         hasher.update(bytes);
-        let hash = hasher.finalize();
+        let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
         Torrent { meta, hash }
     }
 }
@@ -83,7 +84,7 @@ async fn main() {
         let torrent = Torrent::new(file_path);
         println!("Tracker URL: {}", torrent.meta.announce);
         println!("Length: {}", torrent.meta.info.length);
-        println!("Info Hash: {:x}", torrent.hash);
+        println!("Info Hash: {}", hex::encode(torrent.hash));
         println!("Piece Length: {}", torrent.meta.info.piece_length);
         let chunks: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
         for chunk in chunks {
@@ -98,8 +99,8 @@ async fn main() {
         let downloaded = 0;
         let left = torrent.meta.info.length;
         let compact = 1;
-        let url = format!("{}?info_hash={:x}&peer_id={peer_id}&port={port}&\
-        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, torrent.hash);
+        let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
+        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, hex::encode(torrent.hash));
         println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
         let body = res.text().await.unwrap();
