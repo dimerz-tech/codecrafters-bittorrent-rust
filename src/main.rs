@@ -100,12 +100,13 @@ async fn main() {
         let left = torrent.meta.info.length;
         let compact = 1;
         let info_hash :String = hex::encode(torrent.hash).chars().
-            collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &(*el.iter().collect::<String>()));
+            collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
         let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
         uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, info_hash);
         println!("URL: {}", url);
         let res = reqwest::get(url).await.unwrap();
         let body = res.text().await.unwrap();
+        println!("Response {}", body);
         let peers = serde_bencode::de::from_str::<Vec<String>>(body.as_str()).unwrap();
         println!("{:?}", peers);
     }
