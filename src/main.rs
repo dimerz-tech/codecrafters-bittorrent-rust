@@ -81,14 +81,11 @@ impl Torrent {
 
 async fn handshake(peer: &str, hash: [u8; 20]) {
     println!("Peer {}", peer);
-    if let Ok(listener) = TcpListener::bind(peer).await {
-        while let Ok((socket, _)) = listener.accept().await {
-            tokio::spawn(async move {
-                hello(socket, hash).await
-            });
-        }
-    } else {
-        println!("Error");
+    let listener = TcpListener::bind(peer).await.unwrap();
+    while let Ok((socket, _)) = listener.accept().await {
+        tokio::spawn(async move {
+            hello(socket, hash).await
+        });
     }
 }
 
