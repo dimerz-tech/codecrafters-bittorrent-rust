@@ -1,14 +1,10 @@
 extern crate core;
 
-use std::collections::HashMap;
 use std::env;
-use std::io::Read;
 use serde_json;
 use serde_bencode;
 use serde::{Deserialize, Serialize};
-use sha1::{Sha1, Digest, Sha1Core};
-use sha1::digest::Output;
-use serde_urlencoded;
+use sha1::{Sha1, Digest};
 use hex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -85,7 +81,7 @@ impl Torrent {
 
 async fn handshake(peer: &str, hash: [u8; 20]) {
     let listener = TcpListener::bind(peer).await.unwrap();
-    while let Ok((mut socket, _)) = listener.accept().await {
+    while let Ok((socket, _)) = listener.accept().await {
         tokio::spawn(async move {
             hello(socket, hash).await
         });
@@ -180,6 +176,7 @@ async fn main() {
         let file_path =  &args[2];
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
+        handshake(peer, torrent.hash.clone()).await;
     }
     else {
         println!("unknown command: {}", args[1])
