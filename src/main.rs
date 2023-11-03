@@ -82,6 +82,7 @@ async fn handshake(peer: &str, hash: [u8; 20]) {
     hello(stream, hash).await;
 }
 
+#[derive(Debug, Deserialize)]
 struct HandShake {
     proto_len: [u8; 1],
     bit_torrent_str: [u8; 19],
