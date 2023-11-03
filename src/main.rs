@@ -113,7 +113,6 @@ async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
     let client_hello = HandShake::new(hash.clone());
     let hello_req = [client_hello.proto_len.as_slice(),
         client_hello.bit_torrent_str.as_slice(),
-        client_hello.bit_torrent_str.as_slice(),
         client_hello.zeros.as_slice(),
         client_hello.sha1_info_hash.as_slice(),
         client_hello.peer_id.as_slice()].concat();
