@@ -84,7 +84,7 @@ async fn handshake(peer: &str, hash: [u8; 20]) {
 
 struct HandShake {
     proto_len: [u8; 1],
-    bit_torrent_str: [u8; 10],
+    bit_torrent_str: [u8; 19],
     zeros: [u8; 8],
     sha1_info_hash: [u8; 20],
     peer_id: [u8; 20],
@@ -93,7 +93,7 @@ struct HandShake {
 impl HandShake {
     fn new(hash: [u8; 20]) -> Self {
         let proto_len: [u8; 1] = [19];
-        let bit_torrent_str: [u8; 10] = "BitTorrent protocol".as_bytes().try_into().unwrap();
+        let bit_torrent_str: [u8; 19] = "BitTorrent protocol".as_bytes().try_into().unwrap();
         let zeros: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
         let sha1_info_hash = hash;
         let peer_id: [u8; 20] = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9];
@@ -101,8 +101,8 @@ impl HandShake {
     }
 }
 
-impl From<[u8; 59]> for HandShake {
-    fn from(value: [u8; 59]) -> Self {
+impl From<[u8; 68]> for HandShake {
+    fn from(value: [u8; 68]) -> Self {
         let mut hand_shake = HandShake::new([0u8; 20]);
         hand_shake.peer_id.clone_from_slice(&value[39..]);
         hand_shake
@@ -118,7 +118,7 @@ async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
         client_hello.sha1_info_hash.as_slice(),
         client_hello.peer_id.as_slice()].concat();
     stream.write_all(hello_req.as_slice()).await.unwrap();
-    let mut buf = [0u8; 59];
+    let mut buf = [0u8; 68];
     stream.read_exact(&mut buf).await.unwrap();
     let peer_hello = HandShake::from(buf);
     println!("Peer ID: {:?}", peer_hello.peer_id);
