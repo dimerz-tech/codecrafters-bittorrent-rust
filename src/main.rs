@@ -117,13 +117,11 @@ async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
         client_hello.zeros.as_slice(),
         client_hello.sha1_info_hash.as_slice(),
         client_hello.peer_id.as_slice()].concat();
-    println!("Hello Req {:?}", hello_req);
-    println!("Hello Req Size {}", hello_req.len());
     stream.write_all(hello_req.as_slice()).await.unwrap();
     let mut buf = [0u8; 68];
     stream.read_exact(&mut buf).await.unwrap();
     let peer_hello = HandShake::from(buf);
-    println!("Peer ID: {:?}", peer_hello.peer_id);
+    println!("Peer ID: {}", hex::encode(peer_hello.peer_id));
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
