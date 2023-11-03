@@ -104,7 +104,7 @@ impl HandShake {
 impl From<[u8; 68]> for HandShake {
     fn from(value: [u8; 68]) -> Self {
         let mut hand_shake = HandShake::new([0u8; 20]);
-        hand_shake.peer_id.clone_from_slice(&value[39..]);
+        hand_shake.peer_id.clone_from_slice(&value[47..]);
         hand_shake
     }
 }
