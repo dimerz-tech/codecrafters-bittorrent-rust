@@ -1,14 +1,11 @@
-extern crate core;
-
 use std::env;
-use std::net::ToSocketAddrs;
 use serde_json;
 use serde_bencode;
 use serde::{Deserialize, Serialize};
 use sha1::{Sha1, Digest};
 use hex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpStream};
 use u16;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
@@ -81,16 +78,10 @@ impl Torrent {
 }
 
 async fn handshake(peer: &str, hash: [u8; 20]) {
-    let addr = peer.to_socket_addrs().unwrap().next().unwrap();
-    println!("Peer {}", addr);
-    let listener = TcpListener::bind(peer).await.unwrap();
-    while let Ok((socket, _)) = listener.accept().await {
-        tokio::spawn(async move {
-            hello(socket, hash).await
-        });
-    }
+    let stream = TcpStream::connect(peer).await.unwrap();
+    hello(stream, hash).await;
 }
-//
+
 struct HandShake {
     proto_len: [u8; 1],
     bit_torrent_str: [u8; 10],
