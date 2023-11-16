@@ -75,11 +75,33 @@ impl Torrent {
         let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
         Torrent { meta, hash }
     }
+    pub async fn get_peers(&self) -> Vec<String> {
+        let peer_id = "00112233445566778899";
+        let port = 6881;
+        let uploaded = 0;
+        let downloaded = 0;
+        let left = self.meta.info.length;
+        let compact = 1;
+        let info_hash :String = hex::encode(self.hash).chars().
+            collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
+        let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
+        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", self.meta.announce, info_hash);
+        let res = reqwest::get(url).await.unwrap();
+        let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
+        let peers: Vec<String> = resp.peers.chunks(6)
+            .map(|peer| format!("{}.{}.{}.{}:{}", peer[0].to_string(),
+                                peer[1].to_string(),
+                                peer[2].to_string(),
+                                peer[3].to_string(),
+                                u16::from_be_bytes([peer[4].clone(), peer[5].clone()]))).collect();
+        peers
+    }
 }
 
-async fn handshake(peer: &str, hash: [u8; 20]) {
-    let stream = TcpStream::connect(peer).await.unwrap();
-    hello(stream, hash).await;
+async fn process_peer(peer: &str, hash: [u8; 20]) {
+    let mut stream = TcpStream::connect(peer).await.unwrap();
+    hello(&mut stream, hash).await;
+    get_bitfield(&mut stream).await;
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,7 +132,7 @@ impl From<[u8; 68]> for HandShake {
     }
 }
 
-async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
+async fn hello(stream: &mut TcpStream, hash: [u8; 20]) {
     let client_hello = HandShake::new(hash.clone());
     let hello_req = [client_hello.proto_len.as_slice(),
         client_hello.bit_torrent_str.as_slice(),
@@ -122,6 +144,20 @@ async fn hello(mut stream: TcpStream, hash: [u8; 20]) {
     stream.read_exact(&mut buf).await.unwrap();
     let peer_hello = HandShake::from(buf);
     println!("Peer ID: {}", hex::encode(peer_hello.peer_id));
+}
+
+async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
+    let mut len = [0u8; 4];
+    stream.read_exact(&mut len).await.unwrap();
+    let mut id = 0u8;
+    stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
+    assert_eq!(id, 5u8);
+    let mut buf = vec![0u8; (u32::from_be_bytes(len) - 1) as usize];
+    stream.read_exact(&mut buf).await.unwrap();
+    let s = buf.into_iter().fold("".to_string(), |s, b| s + &format!("{:08b}", b));
+    let pos = s.chars().enumerate().filter(|(_, r)| r == &'1').map(|(index, _)| index).collect::<Vec<_>>();
+    println!("Bitfield positions: {:?}", pos);
+    pos
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
@@ -147,30 +183,22 @@ async fn main() {
     } else if command == "peers" {
         let file_path =  &args[2];
         let torrent = Torrent::new(file_path);
-        let peer_id = "00112233445566778899";
-        let port = 6881;
-        let uploaded = 0;
-        let downloaded = 0;
-        let left = torrent.meta.info.length;
-        let compact = 1;
-        let info_hash :String = hex::encode(torrent.hash).chars().
-            collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
-        let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
-        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", torrent.meta.announce, info_hash);
-        let res = reqwest::get(url).await.unwrap();
-        let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
-        let peers: Vec<String> = resp.peers.chunks(6)
-            .map(|peer| format!("{}.{}.{}.{}:{}", peer[0].to_string(),
-                                peer[1].to_string(),
-                                peer[2].to_string(),
-                                peer[3].to_string(),
-                                u16::from_be_bytes([peer[4].clone(), peer[5].clone()]))).collect();
+        let peers = torrent.get_peers().await;
         println!("{:?}", peers);
     } else if command == "handshake" {
         let file_path =  &args[2];
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
-        handshake(peer, torrent.hash.clone()).await;
+        process_peer(peer, torrent.hash.clone()).await;
+    } else if command == "download_piece" {
+        let file_path = &args[4];
+        let piece_path = &args[3];
+        let piece_num: i32 = (&args[5]).parse().unwrap();
+        let torrent = Torrent::new(file_path);
+        let peers = torrent.get_peers().await;
+        let peer = peers.get(0).unwrap();
+        process_peer(peer, torrent.hash.clone()).await;
+
     }
     else {
         println!("unknown command: {}", args[1])
