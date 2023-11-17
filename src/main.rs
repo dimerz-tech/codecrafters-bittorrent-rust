@@ -101,7 +101,7 @@ impl Torrent {
 async fn process_peer(peer: &str, hash: [u8; 20]) {
     let mut stream = TcpStream::connect(peer).await.unwrap();
     hello(&mut stream, hash).await;
-    //get_bitfield(&mut stream).await;
+    get_bitfield(&mut stream).await;
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,6 +147,7 @@ async fn hello(stream: &mut TcpStream, hash: [u8; 20]) {
 }
 
 async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
+    println!("Getting bitfield");
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).await.unwrap();
     let mut id = 0u8;
