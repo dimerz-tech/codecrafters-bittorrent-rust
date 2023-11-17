@@ -147,7 +147,7 @@ async fn hello(stream: &mut TcpStream, hash: [u8; 20]) {
 }
 
 async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
-    let mut len = [0u8; 4];
+    let mut len = [0; 4];
     stream.read_exact(&mut len).await.unwrap();
     let mut id = 0u8;
     stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
