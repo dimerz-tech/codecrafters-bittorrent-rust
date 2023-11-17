@@ -98,10 +98,9 @@ impl Torrent {
     }
 }
 
-async fn process_peer(peer: &str, hash: [u8; 20]) {
+async fn connect_peer(peer: &str) -> TcpStream {
     let mut stream = TcpStream::connect(peer).await.unwrap();
-    hello(&mut stream, hash).await;
-    get_bitfield(&mut stream).await;
+    stream
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,7 +131,7 @@ impl From<[u8; 68]> for HandShake {
     }
 }
 
-async fn hello(stream: &mut TcpStream, hash: [u8; 20]) {
+async fn handshake(stream: &mut TcpStream, hash: [u8; 20]) {
     let client_hello = HandShake::new(hash.clone());
     let hello_req = [client_hello.proto_len.as_slice(),
         client_hello.bit_torrent_str.as_slice(),
@@ -147,7 +146,6 @@ async fn hello(stream: &mut TcpStream, hash: [u8; 20]) {
 }
 
 async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
-    println!("Getting bitfield");
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).await.unwrap();
     let mut id = 0u8;
@@ -190,7 +188,8 @@ async fn main() {
         let file_path =  &args[2];
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
-        process_peer(peer, torrent.hash.clone()).await;
+        let mut connection = connect_peer(peer).await;
+        handshake(&mut connection, torrent.hash.clone()).await;
     } else if command == "download_piece" {
         let file_path = &args[4];
         let piece_path = &args[3];
@@ -198,8 +197,9 @@ async fn main() {
         let torrent = Torrent::new(file_path);
         let peers = torrent.get_peers().await;
         let peer = peers.get(0).unwrap();
-        process_peer(peer, torrent.hash.clone()).await;
-
+        let mut connection = connect_peer(peer).await;
+        handshake(&mut connection, torrent.hash.clone()).await;
+        get_bitfield(&mut connection).await;
     }
     else {
         println!("unknown command: {}", args[1])
