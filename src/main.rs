@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::env;
 use serde_json;
 use serde_bencode;
@@ -159,6 +161,20 @@ async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
     pos
 }
 
+async fn send_interested(stream: &mut TcpStream) {
+    let prefix =  [0u8, 0u8, 0u8, 1u8];
+    let id = [2u8];
+    stream.write_all(&[prefix.as_slice(), id.as_slice()].concat()).await.unwrap();
+}
+
+async fn get_unchoke(stream: &mut TcpStream) {
+    let mut len = [0u8; 4];
+    stream.read_exact(&mut len).await.unwrap();
+    let mut id = 0u8;
+    stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
+    assert_eq!(id, 1u8);
+}
+
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 #[tokio::main]
 async fn main() {
@@ -200,6 +216,9 @@ async fn main() {
         let mut connection = connect_peer(peer).await;
         handshake(&mut connection, torrent.hash.clone()).await;
         get_bitfield(&mut connection).await;
+        send_interested(&mut connection).await;
+        get_unchoke(&mut connection).await;
+        println!("I am here");
     }
     else {
         println!("unknown command: {}", args[1])
