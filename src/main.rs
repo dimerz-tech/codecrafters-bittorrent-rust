@@ -175,7 +175,7 @@ async fn get_unchoke(stream: &mut TcpStream) {
     assert_eq!(id, 1u8);
 }
 
-async fn block_request(stream: &mut TcpStream, index: usize, chunk: usize) {
+async fn block_request(stream: &mut TcpStream, index: i32, chunk: i32) {
     let begin = (index * chunk).to_ne_bytes();
     let length = chunk.to_ne_bytes();
     let prefix =  [0u8, 0u8, 0u8, 13u8];
@@ -186,7 +186,7 @@ async fn block_request(stream: &mut TcpStream, index: usize, chunk: usize) {
     stream.write_all(&request).await.unwrap();
 }
 
-async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
+async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
     println!("Waiting for block.... {}", index);
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).await.unwrap();
@@ -195,7 +195,7 @@ async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
     assert_eq!(id, 7u8);
     let mut ind = 0u8;
     stream.read_exact(std::slice::from_mut(&mut ind)).await.unwrap();
-    assert_eq!(ind as usize, *index);
+    assert_eq!(ind as i32, index);
     let mut begin = 0u8;
     stream.read_exact(std::slice::from_mut(&mut begin)).await.unwrap();
     let mut buf = vec![0u8; (u32::from_be_bytes(len) - 9) as usize];
@@ -204,25 +204,25 @@ async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
 }
 
 async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
-    let file_size = torrent.meta.info.length.clone();
-    let mut piece_size = torrent.meta.info.piece_length.clone();
+    let file_size = torrent.meta.info.length.clone() as i32;
+    let mut piece_size: i32 = torrent.meta.info.piece_length.clone() as i32;
     let (int_pieces, remainder_piece) = (&file_size / &piece_size, &file_size % &piece_size);
-    if piece as usize == int_pieces && remainder_piece != 0 {
+    if piece == int_pieces && remainder_piece != 0 {
         piece_size = remainder_piece
     }
-    let chunk = 16 * 1024;
+    let chunk: i32 = 16 * 1024;
     let (int_block, remainder_block) = (&piece_size / &chunk, &piece_size % &chunk);
     let mut loaded_piece: Vec<u8> = Vec::new();
     for i in 0..int_block {
         println!("Downloading block {}, size {}........", i, chunk);
         block_request(stream, i, chunk.clone()).await;
-        let mut block = block_response(stream, &i).await;
+        let mut block = block_response(stream, i.clone()).await;
         loaded_piece.append(&mut block);
     }
     if remainder_block != 0 {
         println!("Downloading block {}, size {}........", int_block, remainder_block);
         block_request(stream, int_block, remainder_block).await;
-        let mut block = block_response(stream, &int_block).await;
+        let mut block = block_response(stream, int_block.clone()).await;
         loaded_piece.append(&mut block);
     }
 }
