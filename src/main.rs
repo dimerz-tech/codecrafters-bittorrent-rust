@@ -176,10 +176,10 @@ async fn get_unchoke(stream: &mut TcpStream) {
 }
 
 async fn block_request(stream: &mut TcpStream, index: i32, chunk: i32) {
-    let begin = (index * chunk).to_ne_bytes();
+    let begin = (index * chunk).to_be_bytes();
     let length = chunk.to_be_bytes();
     let prefix =  [0u8, 0u8, 0u8, 13u8];
-    let position = index.to_ne_bytes();
+    let position = index.to_be_bytes();
     let id = [6u8];
     let request = [prefix.as_slice(), id.as_slice(), position.as_slice(), begin.as_slice(), length.as_slice()].concat();
     println!("Begin {:?}", begin);
