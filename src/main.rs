@@ -175,6 +175,56 @@ async fn get_unchoke(stream: &mut TcpStream) {
     assert_eq!(id, 1u8);
 }
 
+async fn block_request(stream: &mut TcpStream, index: usize, chunk: usize) {
+    let begin = [(index * chunk) as u8];
+    let length = [chunk as u8];
+    let prefix =  [0u8, 0u8, 0u8, 13u8];
+    let id = [6u8];
+    let request = [prefix.as_slice(), id.as_slice(), [index as u8].as_slice(), begin.as_slice(), length.as_slice()].concat();
+    stream.write_all(&request).await.unwrap();
+}
+
+async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
+    let mut len = [0u8; 4];
+    stream.read_exact(&mut len).await.unwrap();
+    let mut id = 0u8;
+    stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
+    assert_eq!(id, 7u8);
+    let mut ind = 0u8;
+    stream.read_exact(std::slice::from_mut(&mut ind)).await.unwrap();
+    assert_eq!(ind as usize, *index);
+    let mut begin = 0u8;
+    stream.read_exact(std::slice::from_mut(&mut begin)).await.unwrap();
+    let mut buf = vec![0u8; (u32::from_be_bytes(len) - 9) as usize];
+    stream.read_exact(&mut buf).await.unwrap();
+    buf
+}
+
+async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
+    let file_size = torrent.meta.info.length.clone();
+    let mut piece_size = torrent.meta.info.piece_length.clone();
+    let (int_pieces, remainder_piece) = (&file_size / &piece_size, &file_size % &piece_size);
+    if piece as usize == int_pieces && remainder_piece != 0 {
+        piece_size = remainder_piece
+    }
+    let chunk = 16 * 1024;
+    let (int_block, remainder_block) = (&piece_size / &chunk, &piece_size % &chunk);
+    let mut loaded_piece: Vec<u8> = Vec::new();
+    for i in 0..int_block {
+        println!("Downloading block {}, size {}........", i, chunk);
+        block_request(stream, i, chunk.clone()).await;
+        let mut block = block_response(stream, &i).await;
+        loaded_piece.append(&mut block);
+    }
+    if remainder_block != 0 {
+        println!("Downloading block {}, size {}........", int_block, remainder_block);
+        block_request(stream, int_block, remainder_block).await;
+        let mut block = block_response(stream, &int_block).await;
+        loaded_piece.append(&mut block);
+    }
+}
+
+
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 #[tokio::main]
 async fn main() {
@@ -218,6 +268,7 @@ async fn main() {
         get_bitfield(&mut connection).await;
         send_interested(&mut connection).await;
         get_unchoke(&mut connection).await;
+        load_piece(&mut connection, piece_num, &torrent).await;
         println!("I am here");
     }
     else {
