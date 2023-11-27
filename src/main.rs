@@ -202,6 +202,7 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
     stream.read_exact(std::slice::from_mut(&mut begin)).await.unwrap();
     let mut buf = vec![0u8; (u32::from_be_bytes(len) - 9) as usize];
     stream.read_exact(&mut buf).await.unwrap();
+    println!("Block {} is downloaded", index);
     buf
 }
 
