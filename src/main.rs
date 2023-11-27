@@ -222,6 +222,7 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
         block_request(stream, i, chunk.clone()).await;
         let mut block = block_response(stream, i.clone()).await;
         loaded_piece.append(&mut block);
+        println!("File size: {}", loaded_piece.len());
     }
     println!("Remainded block");
     if remainder_block != 0 {
