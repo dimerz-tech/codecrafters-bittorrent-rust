@@ -176,11 +176,13 @@ async fn get_unchoke(stream: &mut TcpStream) {
 }
 
 async fn block_request(stream: &mut TcpStream, index: usize, chunk: usize) {
-    let begin = [(index * chunk) as u8];
-    let length = [chunk as u8];
+    let begin = (index * chunk).to_ne_bytes();
+    let length = chunk.to_ne_bytes();
     let prefix =  [0u8, 0u8, 0u8, 13u8];
     let id = [6u8];
     let request = [prefix.as_slice(), id.as_slice(), [index as u8].as_slice(), begin.as_slice(), length.as_slice()].concat();
+    println!("Begin {:?}", begin);
+    println!("Length {:?}", length);
     stream.write_all(&request).await.unwrap();
 }
 
@@ -191,7 +193,6 @@ async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
     let mut id = 0u8;
     stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
     assert_eq!(id, 7u8);
-    println!("Parsing block");
     let mut ind = 0u8;
     stream.read_exact(std::slice::from_mut(&mut ind)).await.unwrap();
     assert_eq!(ind as usize, *index);
