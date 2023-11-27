@@ -181,7 +181,7 @@ async fn block_request(stream: &mut TcpStream, index: i32, chunk: i32) {
     let prefix =  [0u8, 0u8, 0u8, 13u8];
     let position = index.to_ne_bytes();
     let id = [6u8];
-    let request = [prefix.as_slice(), id.as_slice(), position, begin.as_slice(), length.as_slice()].concat();
+    let request = [prefix.as_slice(), id.as_slice(), position.as_slice(), begin.as_slice(), length.as_slice()].concat();
     println!("Begin {:?}", begin);
     println!("Length {:?}", length);
     stream.write_all(&request).await.unwrap();
