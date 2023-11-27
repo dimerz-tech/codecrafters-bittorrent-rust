@@ -185,11 +185,13 @@ async fn block_request(stream: &mut TcpStream, index: usize, chunk: usize) {
 }
 
 async fn block_response(stream: &mut TcpStream, index: &usize) -> Vec<u8> {
+    println!("Waiting for block.... {}", index);
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).await.unwrap();
     let mut id = 0u8;
     stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
     assert_eq!(id, 7u8);
+    println!("Parsing block");
     let mut ind = 0u8;
     stream.read_exact(std::slice::from_mut(&mut ind)).await.unwrap();
     assert_eq!(ind as usize, *index);
