@@ -212,6 +212,7 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     if piece == int_pieces && remainder_piece != 0 {
         piece_size = remainder_piece
     }
+    println!("File size {}, piece size {}", file_size, piece_size);
     let chunk: i32 = 16 * 1024;
     let (int_block, remainder_block) = (&piece_size / &chunk, &piece_size % &chunk);
     let mut loaded_piece: Vec<u8> = Vec::new();
