@@ -209,6 +209,7 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
 async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     let file_size = torrent.meta.info.length.clone() as i32;
     let mut piece_size: i32 = torrent.meta.info.piece_length.clone() as i32;
+    println!("Piece {}, piece size {}", piece, piece_size);
     let (int_pieces, remainder_piece) = (&file_size / &piece_size, &file_size % &piece_size);
     if piece == int_pieces && remainder_piece != 0 {
         piece_size = remainder_piece
