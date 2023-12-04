@@ -185,6 +185,7 @@ async fn block_request(stream: &mut TcpStream, piece: i32, position: i32, block:
     println!("Begin {:?}", begin);
     println!("Length {:?}", length);
     println!("Index {:?}", index);
+
     stream.write_all(&request).await.unwrap();
 }
 
