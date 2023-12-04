@@ -206,8 +206,8 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
 
 async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     let file_size = torrent.meta.info.length.clone() as i32;
-    let mut piece_len: i32 = torrent.meta.info.piece_length.clone() as i32;
-    let mut piece_size = piece_len.min(file_size - piece_len * piece);
+    let piece_len: i32 = torrent.meta.info.piece_length.clone() as i32;
+    let piece_size = piece_len.min(file_size - piece_len * piece);
     println!("File size {}, Piece {}, piece size {}", file_size, piece, piece_size);
     const BLOCK_SIZE: i32 = 16 * 1024;
     let mut loaded_piece: Vec<u8> = Vec::new();
