@@ -298,7 +298,7 @@ async fn main() {
         get_unchoke(&mut connection).await;
         let pieces: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
         let mut loaded_pieces: Vec<u8> = Vec::new();
-        for (i, piece_hash) in pieces.into_iter().enumerate() {
+        for (i, _) in pieces.into_iter().enumerate() {
             let mut piece = load_piece(&mut connection, i as i32, &torrent).await;
             loaded_pieces.append(&mut piece);
         }
