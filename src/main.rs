@@ -6,6 +6,7 @@ use serde_bencode;
 use serde::{Deserialize, Serialize};
 use sha1::{Sha1, Digest};
 use hex;
+use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream};
 use u16;
@@ -205,7 +206,7 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
     buf
 }
 
-async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
+async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) -> Vec<u8> {
     let file_size = torrent.meta.info.length.clone() as i32;
     let piece_len: i32 = torrent.meta.info.piece_length.clone() as i32;
     let piece_size = piece_len.min(file_size - piece_len * piece);
@@ -229,6 +230,12 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     hasher.update(&loaded_piece);
     let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
     assert_eq!(hash, piece_hash);
+    loaded_piece
+}
+
+async fn write_file(path: &String, data: &Vec<u8>) {
+    let mut file = File::create(path).await.unwrap();
+    file.write_all(data).await.unwrap();
 }
 
 
@@ -275,7 +282,8 @@ async fn main() {
         get_bitfield(&mut connection).await;
         send_interested(&mut connection).await;
         get_unchoke(&mut connection).await;
-        load_piece(&mut connection, piece_num, &torrent).await;
+        let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
+        write_file(piece_path, &loaded_piece).await;
         println!("I am here");
     }
     else {
