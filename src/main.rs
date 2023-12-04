@@ -175,13 +175,13 @@ async fn get_unchoke(stream: &mut TcpStream) {
     assert_eq!(id, 1u8);
 }
 
-async fn block_request(stream: &mut TcpStream, index: i32, chunk: i32) {
-    let begin = (index * chunk).to_be_bytes();
-    let length = chunk.to_be_bytes();
+async fn block_request(stream: &mut TcpStream, piece: i32, position: i32, block: i32) {
+    let index = piece.to_be_bytes();
+    let begin = position.to_be_bytes();
+    let length = block.to_be_bytes();
     let prefix =  [0u8, 0u8, 0u8, 13u8];
-    let position = index.to_be_bytes();
     let id = [6u8];
-    let request = [prefix.as_slice(), id.as_slice(), position.as_slice(), begin.as_slice(), length.as_slice()].concat();
+    let request = [prefix.as_slice(), id.as_slice(), index.as_slice(), begin.as_slice(), length.as_slice()].concat();
     println!("Begin {:?}", begin);
     println!("Length {:?}", length);
     println!("Index {:?}", position);
@@ -189,7 +189,6 @@ async fn block_request(stream: &mut TcpStream, index: i32, chunk: i32) {
 }
 
 async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
-    println!("Waiting for block.... {}", index);
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).await.unwrap();
     let mut id = 0u8;
@@ -208,34 +207,20 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
 
 async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     let file_size = torrent.meta.info.length.clone() as i32;
-    let mut piece_size: i32 = torrent.meta.info.piece_length.clone() as i32;
-    println!("Piece {}, piece size {}", piece, piece_size);
-    let (int_pieces, remainder_piece) = (&file_size / &piece_size, &file_size % &piece_size);
-    println!("Int pieces {}, Remainder piece {}", int_pieces, remainder_piece);
-    let chunks: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
-    println!("Origin Piece count {}", chunks.len());
-    const CHUNK: i32 = 16 * 1024;
-    let nblocks = (piece_size + (CHUNK - 1)) / CHUNK;
-    println!("NBlock {}", nblocks);
-    if piece == int_pieces && remainder_piece != 0 {
-        piece_size = remainder_piece
-    }
-    println!("File size {}, piece size {}", file_size, piece_size);
-    let (int_block, remainder_block) = (&piece_size / &CHUNK, &piece_size % &CHUNK);
+    let mut piece_len: i32 = torrent.meta.info.piece_length.clone() as i32;
+    let mut piece_size = piece_len.min(file_size - piece_len * piece);
+    println!("File size {}, Piece {}, piece size {}", file_size, piece, piece_size);
+    const BLOCK_SIZE: i32 = 16 * 1024;
     let mut loaded_piece: Vec<u8> = Vec::new();
-    for i in 0..int_block {
-        println!("Downloading block {}, size {}........", i, CHUNK);
-        block_request(stream, i, CHUNK.clone()).await;
-        let mut block = block_response(stream, i.clone()).await;
+    let mut remaining_block = piece_size;
+    while remaining_block > 0 {
+        let position = piece_size - remaining_block;
+        let block = BLOCK_SIZE.min(remaining_block);
+        println!("Block position {}, block size {}", position, block);
+        block_request(stream, piece, position, block).await;
+        let mut block = block_response(stream, piece).await;
         loaded_piece.append(&mut block);
         println!("File size: {}", loaded_piece.len());
-    }
-    println!("Remainded block");
-    if remainder_block != 0 {
-        println!("Downloading block {}, size {}........", int_block, remainder_block);
-        block_request(stream, int_block, remainder_block).await;
-        let mut block = block_response(stream, int_block.clone()).await;
-        loaded_piece.append(&mut block);
     }
 }
 
