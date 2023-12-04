@@ -221,7 +221,7 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
         let mut block = block_response(stream, piece).await;
         loaded_piece.append(&mut block);
         println!("File size: {}", loaded_piece.len());
-        //remaining_block -= block_size;
+        remaining_block -= block_size;
     }
 }
 
