@@ -101,7 +101,7 @@ impl Torrent {
 }
 
 async fn connect_peer(peer: &str) -> TcpStream {
-    let mut stream = TcpStream::connect(peer).await.unwrap();
+    let stream = TcpStream::connect(peer).await.unwrap();
     stream
 }
 
