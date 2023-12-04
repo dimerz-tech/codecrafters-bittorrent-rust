@@ -211,16 +211,21 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     let mut piece_size: i32 = torrent.meta.info.piece_length.clone() as i32;
     println!("Piece {}, piece size {}", piece, piece_size);
     let (int_pieces, remainder_piece) = (&file_size / &piece_size, &file_size % &piece_size);
+    println!("Int pieces {}, Remainder piece {}", int_pieces, remainder_piece);
+    let chunks: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
+    println!("Origin Piece count {}", chunks.len());
+    const CHUNK: i32 = 16 * 1024;
+    let nblocks = (piece_size + (CHUNK - 1)) / CHUNK;
+    println!("NBlock {}", nblocks);
     if piece == int_pieces && remainder_piece != 0 {
         piece_size = remainder_piece
     }
     println!("File size {}, piece size {}", file_size, piece_size);
-    let chunk: i32 = 16 * 1024;
-    let (int_block, remainder_block) = (&piece_size / &chunk, &piece_size % &chunk);
+    let (int_block, remainder_block) = (&piece_size / &CHUNK, &piece_size % &CHUNK);
     let mut loaded_piece: Vec<u8> = Vec::new();
     for i in 0..int_block {
-        println!("Downloading block {}, size {}........", i, chunk);
-        block_request(stream, i, chunk.clone()).await;
+        println!("Downloading block {}, size {}........", i, CHUNK);
+        block_request(stream, i, CHUNK.clone()).await;
         let mut block = block_response(stream, i.clone()).await;
         loaded_piece.append(&mut block);
         println!("File size: {}", loaded_piece.len());
