@@ -184,7 +184,7 @@ async fn block_request(stream: &mut TcpStream, piece: i32, position: i32, block:
     let request = [prefix.as_slice(), id.as_slice(), index.as_slice(), begin.as_slice(), length.as_slice()].concat();
     println!("Begin {:?}", begin);
     println!("Length {:?}", length);
-    println!("Index {:?}", position);
+    println!("Index {:?}", index);
     stream.write_all(&request).await.unwrap();
 }
 
@@ -201,7 +201,6 @@ async fn block_response(stream: &mut TcpStream, index: i32) -> Vec<u8> {
     stream.read_exact(&mut begin).await.unwrap();
     let mut buf = vec![0u8; (i32::from_be_bytes(len) - 9) as usize];
     stream.read_exact(&mut buf).await.unwrap();
-    println!("Block {} is downloaded", index);
     buf
 }
 
@@ -215,12 +214,13 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
     let mut remaining_block = piece_size;
     while remaining_block > 0 {
         let position = piece_size - remaining_block;
-        let block = BLOCK_SIZE.min(remaining_block);
-        println!("Block position {}, block size {}", position, block);
-        block_request(stream, piece, position, block).await;
+        let block_size = BLOCK_SIZE.min(remaining_block);
+        println!("Block position {}, block size {}", position, block_size);
+        block_request(stream, piece, position, block_size).await;
         let mut block = block_response(stream, piece).await;
         loaded_piece.append(&mut block);
         println!("File size: {}", loaded_piece.len());
+        remaining_block -= block_size;
     }
 }
 
