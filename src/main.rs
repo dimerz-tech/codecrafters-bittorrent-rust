@@ -223,6 +223,12 @@ async fn load_piece(stream: &mut TcpStream, piece: i32, torrent: &Torrent) {
         println!("File size: {}", loaded_piece.len());
         remaining_block -= block_size;
     }
+    let chunks: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
+    let piece_hash = chunks[piece as usize];
+    let mut hasher = Sha1::new();
+    hasher.update(&loaded_piece);
+    let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
+    assert_eq!(hash, piece_hash);
 }
 
 
