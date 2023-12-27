@@ -1,3 +1,5 @@
+mod torrent;
+
 extern crate core;
 
 use std::env;
@@ -65,7 +67,7 @@ pub struct Response {
 #[derive(Debug, Deserialize)]
 struct Torrent {
     meta: MetaInfo,
-    hash: [u8; 20]
+    info_hash: [u8; 20]
 }
 
 impl Torrent {
@@ -76,7 +78,7 @@ impl Torrent {
         let bytes = serde_bencode::to_bytes(&meta.info).unwrap();
         hasher.update(bytes);
         let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
-        Torrent { meta, hash }
+        Torrent { meta, info_hash: hash }
     }
     pub async fn get_peers(&self) -> Vec<String> {
         let peer_id = "00112233445566778899";
@@ -85,7 +87,7 @@ impl Torrent {
         let downloaded = 0;
         let left = self.meta.info.length;
         let compact = 1;
-        let info_hash :String = hex::encode(self.hash).chars().
+        let info_hash :String = hex::encode(self.info_hash).chars().
             collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
         let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
         uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", self.meta.announce, info_hash);
@@ -253,7 +255,7 @@ async fn main() {
         let torrent = Torrent::new(file_path);
         println!("Tracker URL: {}", torrent.meta.announce);
         println!("Length: {}", torrent.meta.info.length);
-        println!("Info Hash: {}", hex::encode(torrent.hash));
+        println!("Info Hash: {}", hex::encode(torrent.info_hash));
         println!("Piece Length: {}", torrent.meta.info.piece_length);
         let chunks: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
         for chunk in chunks {
@@ -269,7 +271,7 @@ async fn main() {
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
         let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.hash.clone()).await;
+        handshake(&mut connection, torrent.info_hash.clone()).await;
     } else if command == "download_piece" {
         let file_path = &args[4];
         let piece_path = &args[3];
@@ -278,7 +280,7 @@ async fn main() {
         let peers = torrent.get_peers().await;
         let peer = peers.get(0).unwrap();
         let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.hash.clone()).await;
+        handshake(&mut connection, torrent.info_hash.clone()).await;
         get_bitfield(&mut connection).await;
         send_interested(&mut connection).await;
         get_unchoke(&mut connection).await;
@@ -292,7 +294,7 @@ async fn main() {
         let peers = torrent.get_peers().await;
         let peer = peers.get(0).unwrap();
         let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.hash.clone()).await;
+        handshake(&mut connection, torrent.info_hash.clone()).await;
         get_bitfield(&mut connection).await;
         send_interested(&mut connection).await;
         get_unchoke(&mut connection).await;
