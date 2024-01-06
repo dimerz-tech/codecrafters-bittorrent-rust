@@ -1,8 +1,10 @@
 mod torrent;
-
-extern crate core;
+mod tracker;
+mod peer;
+mod piece;
 
 use std::env;
+use anyhow::anyhow;
 use serde_json;
 use serde_bencode;
 use serde::{Deserialize, Serialize};
@@ -12,18 +14,19 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream};
 use u16;
+use crate::torrent::Torrent;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
     match value {
         serde_bencode::value::Value::Bytes(bytes) => {
             serde_json::Value::String(String::from_utf8_lossy(bytes.as_slice()).to_string())
-        },
+        }
         serde_bencode::value::Value::Int(int) => {
             serde_json::Value::Number(serde_json::value::Number::from(int))
-        },
+        }
         serde_bencode::value::Value::List(list) => {
             serde_json::Value::Array(list.into_iter().map(|el| bencode_to_serde(el)).collect())
-        },
+        }
         serde_bencode::value::Value::Dict(dict) => {
             serde_json::Value::Object(dict.into_iter().map(|el|
                 (String::from_utf8_lossy(el.0.as_slice()).to_string(), bencode_to_serde(el.1))).collect())
@@ -38,70 +41,8 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
     bencode_to_serde(value)
 }
 
-#[derive(Debug, Deserialize)]
-struct MetaInfo {
-    announce: String,
-    info: Info
-}
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Info {
-    length: usize,
-    name: String,
-    #[serde(rename = "piece length")]
-    piece_length: usize,
-    pieces: serde_bytes::ByteBuf
-}
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Response {
-    pub complete: usize,
-    pub incomplete: usize,
-    pub interval: usize,
-    #[serde(rename = "min interval")]
-    pub min_interval: usize,
-    #[serde(with = "serde_bytes")]
-    pub peers: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Torrent {
-    meta: MetaInfo,
-    info_hash: [u8; 20]
-}
-
-impl Torrent {
-    pub fn new(file_path: &String) -> Self {
-        let buf = std::fs::read(file_path).unwrap();
-        let mut hasher = Sha1::new();
-        let meta =  serde_bencode::de::from_bytes::<MetaInfo>(&buf).unwrap();
-        let bytes = serde_bencode::to_bytes(&meta.info).unwrap();
-        hasher.update(bytes);
-        let hash: [u8; 20] = hasher.finalize().try_into().unwrap();
-        Torrent { meta, info_hash: hash }
-    }
-    pub async fn get_peers(&self) -> Vec<String> {
-        let peer_id = "00112233445566778899";
-        let port = 6881;
-        let uploaded = 0;
-        let downloaded = 0;
-        let left = self.meta.info.length;
-        let compact = 1;
-        let info_hash :String = hex::encode(self.info_hash).chars().
-            collect::<Vec<char>>().chunks(2).fold(String::new(), |acc, el| acc + "%" + &*el.iter().collect::<String>());
-        let url = format!("{}?info_hash={}&peer_id={peer_id}&port={port}&\
-        uploaded={uploaded}&downloaded={downloaded}&left={left}&compact={compact}", self.meta.announce, info_hash);
-        let res = reqwest::get(url).await.unwrap();
-        let resp: Response = serde_bencode::from_bytes(res.bytes().await.unwrap().as_ref()).unwrap();
-        let peers: Vec<String> = resp.peers.chunks(6)
-            .map(|peer| format!("{}.{}.{}.{}:{}", peer[0].to_string(),
-                                peer[1].to_string(),
-                                peer[2].to_string(),
-                                peer[3].to_string(),
-                                u16::from_be_bytes([peer[4].clone(), peer[5].clone()]))).collect();
-        peers
-    }
-}
 
 async fn connect_peer(peer: &str) -> TcpStream {
     let stream = TcpStream::connect(peer).await.unwrap();
@@ -124,7 +65,7 @@ impl HandShake {
         let zeros: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
         let sha1_info_hash = hash;
         let peer_id: [u8; 20] = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9];
-        HandShake {proto_len, bit_torrent_str, zeros, sha1_info_hash, peer_id}
+        HandShake { proto_len, bit_torrent_str, zeros, sha1_info_hash, peer_id }
     }
 }
 
@@ -165,7 +106,7 @@ async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
 }
 
 async fn send_interested(stream: &mut TcpStream) {
-    let prefix =  [0u8, 0u8, 0u8, 1u8];
+    let prefix = [0u8, 0u8, 0u8, 1u8];
     let id = [2u8];
     stream.write_all(&[prefix.as_slice(), id.as_slice()].concat()).await.unwrap();
 }
@@ -182,7 +123,7 @@ async fn block_request(stream: &mut TcpStream, piece: i32, position: i32, block:
     let index = piece.to_be_bytes();
     let begin = position.to_be_bytes();
     let length = block.to_be_bytes();
-    let prefix =  [0u8, 0u8, 0u8, 13u8];
+    let prefix = [0u8, 0u8, 0u8, 13u8];
     let id = [6u8];
     let request = [prefix.as_slice(), id.as_slice(), index.as_slice(), begin.as_slice(), length.as_slice()].concat();
     println!("Begin {:?}", begin);
@@ -243,15 +184,16 @@ async fn write_file(path: &String, data: &Vec<u8>) {
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let command = &args[1];
     if command == "decode" {
         let encoded_value = &args[2];
         let decoded_value = decode_bencoded_value(encoded_value);
         println!("{}", decoded_value);
+        Ok(())
     } else if command == "info" {
-        let file_path =  &args[2];
+        let file_path = &args[2];
         let torrent = Torrent::new(file_path);
         println!("Tracker URL: {}", torrent.meta.announce);
         println!("Length: {}", torrent.meta.info.length);
@@ -261,23 +203,28 @@ async fn main() {
         for chunk in chunks {
             println!("{}", hex::encode(chunk));
         }
+        Ok(())
     } else if command == "peers" {
-        let file_path =  &args[2];
+        let file_path = &args[2];
         let torrent = Torrent::new(file_path);
-        let peers = torrent.get_peers().await;
-        println!("{:?}", peers);
+        let peers = tracker::get_peers(&torrent).await?;
+        for peer in peers {
+            println!("{}", peer);
+        }
+        Ok(())
     } else if command == "handshake" {
-        let file_path =  &args[2];
+        let file_path = &args[2];
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
         let mut connection = connect_peer(peer).await;
         handshake(&mut connection, torrent.info_hash.clone()).await;
+        Ok(())
     } else if command == "download_piece" {
         let file_path = &args[4];
         let piece_path = &args[3];
         let piece_num: i32 = (&args[5]).parse().unwrap();
         let torrent = Torrent::new(file_path);
-        let peers = torrent.get_peers().await;
+        let peers = tracker::get_peers().await?;
         let peer = peers.get(0).unwrap();
         let mut connection = connect_peer(peer).await;
         handshake(&mut connection, torrent.info_hash.clone()).await;
@@ -287,6 +234,7 @@ async fn main() {
         let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
         write_file(piece_path, &loaded_piece).await;
         println!("I am here");
+        Ok(())
     } else if command == "download" {
         let torrent_path = &args[4];
         let file_path = &args[3];
@@ -305,8 +253,9 @@ async fn main() {
             loaded_pieces.append(&mut piece);
         }
         write_file(file_path, &loaded_pieces).await;
-    }
-    else {
-        println!("unknown command: {}", args[1])
+        Ok(())
+    } else {
+        println!("unknown command: {}", args[1]);
+        Err(anyhow!("Unknown command"))
     }
 }
