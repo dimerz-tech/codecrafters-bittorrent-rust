@@ -4,6 +4,7 @@ mod peer;
 mod piece;
 
 use std::env;
+use std::str::FromStr;
 use anyhow::anyhow;
 use serde_json;
 use serde_bencode;
@@ -14,6 +15,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream};
 use u16;
+use crate::peer::Peer;
 use crate::torrent::Torrent;
 
 fn bencode_to_serde(value: serde_bencode::value::Value) -> serde_json::Value {
@@ -47,48 +49,6 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
 async fn connect_peer(peer: &str) -> TcpStream {
     let stream = TcpStream::connect(peer).await.unwrap();
     stream
-}
-
-#[derive(Debug, Deserialize)]
-struct HandShake {
-    proto_len: [u8; 1],
-    bit_torrent_str: [u8; 19],
-    zeros: [u8; 8],
-    sha1_info_hash: [u8; 20],
-    peer_id: [u8; 20],
-}
-
-impl HandShake {
-    fn new(hash: [u8; 20]) -> Self {
-        let proto_len: [u8; 1] = [19];
-        let bit_torrent_str: [u8; 19] = "BitTorrent protocol".as_bytes().try_into().unwrap();
-        let zeros: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-        let sha1_info_hash = hash;
-        let peer_id: [u8; 20] = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9];
-        HandShake { proto_len, bit_torrent_str, zeros, sha1_info_hash, peer_id }
-    }
-}
-
-impl From<[u8; 68]> for HandShake {
-    fn from(value: [u8; 68]) -> Self {
-        let mut hand_shake = HandShake::new([0u8; 20]);
-        hand_shake.peer_id.clone_from_slice(&value[48..]);
-        hand_shake
-    }
-}
-
-async fn handshake(stream: &mut TcpStream, hash: [u8; 20]) {
-    let client_hello = HandShake::new(hash.clone());
-    let hello_req = [client_hello.proto_len.as_slice(),
-        client_hello.bit_torrent_str.as_slice(),
-        client_hello.zeros.as_slice(),
-        client_hello.sha1_info_hash.as_slice(),
-        client_hello.peer_id.as_slice()].concat();
-    stream.write_all(hello_req.as_slice()).await.unwrap();
-    let mut buf = [0u8; 68];
-    stream.read_exact(&mut buf).await.unwrap();
-    let peer_hello = HandShake::from(buf);
-    println!("Peer ID: {}", hex::encode(peer_hello.peer_id));
 }
 
 async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
@@ -216,8 +176,8 @@ async fn main() -> anyhow::Result<()> {
         let file_path = &args[2];
         let torrent = Torrent::new(file_path);
         let peer = &args[3];
-        let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.info_hash.clone()).await;
+        let mut peer = Peer::from_str(peer.as_str())?;
+        peer.handshake(torrent.info_hash).await?;
         Ok(())
     } else if command == "download_piece" {
         let file_path = &args[4];
