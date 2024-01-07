@@ -95,3 +95,13 @@ impl From<[u8; 68]> for HandShake {
         hand_shake
     }
 }
+
+// Communication between peers
+struct PeerMessage {
+    // The length prefix is a four byte big-endian value
+    pub prefix: i32,
+    // The message ID is a single decimal byte
+    pub id: i32,
+    // The payload is message dependent.
+    pub payload: Vec<u8>
+}

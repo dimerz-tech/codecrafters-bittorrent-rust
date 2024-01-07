@@ -51,20 +51,6 @@ async fn connect_peer(peer: &str) -> TcpStream {
     stream
 }
 
-async fn get_bitfield(stream: &mut TcpStream) -> Vec<usize> {
-    let mut len = [0u8; 4];
-    stream.read_exact(&mut len).await.unwrap();
-    let mut id = 0u8;
-    stream.read_exact(std::slice::from_mut(&mut id)).await.unwrap();
-    assert_eq!(id, 5u8);
-    let mut buf = vec![0u8; (u32::from_be_bytes(len) - 1) as usize];
-    stream.read_exact(&mut buf).await.unwrap();
-    let s = buf.into_iter().fold("".to_string(), |s, b| s + &format!("{:08b}", b));
-    let pos = s.chars().enumerate().filter(|(_, r)| r == &'1').map(|(index, _)| index).collect::<Vec<_>>();
-    println!("Bitfield positions: {:?}", pos);
-    pos
-}
-
 async fn send_interested(stream: &mut TcpStream) {
     let prefix = [0u8, 0u8, 0u8, 1u8];
     let id = [2u8];
@@ -184,15 +170,15 @@ async fn main() -> anyhow::Result<()> {
         let piece_path = &args[3];
         let piece_num: i32 = (&args[5]).parse().unwrap();
         let torrent = Torrent::new(file_path);
-        let peers = tracker::get_peers().await?;
-        let peer = peers.get(0).unwrap();
-        let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.info_hash.clone()).await;
-        get_bitfield(&mut connection).await;
-        send_interested(&mut connection).await;
-        get_unchoke(&mut connection).await;
-        let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
-        write_file(piece_path, &loaded_piece).await;
+        let peers = tracker::get_peers(&torrent).await?;
+        for mut peer in peers {
+            peer.handshake(torrent.info_hash.clone()).await?;
+            get_bitfield(&mut connection).await;
+            send_interested(&mut connection).await;
+            get_unchoke(&mut connection).await;
+            let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
+            write_file(piece_path, &loaded_piece).await;
+        }
         println!("I am here");
         Ok(())
     } else if command == "download" {
