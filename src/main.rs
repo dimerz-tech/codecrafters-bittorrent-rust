@@ -172,33 +172,33 @@ async fn main() -> anyhow::Result<()> {
         let torrent = Torrent::new(file_path);
         let peers = tracker::get_peers(&torrent).await?;
         for mut peer in peers {
-            peer.handshake(torrent.info_hash.clone()).await?;
-            get_bitfield(&mut connection).await;
-            send_interested(&mut connection).await;
-            get_unchoke(&mut connection).await;
-            let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
-            write_file(piece_path, &loaded_piece).await;
+            peer.handshake(torrent.info_hash).await?;
+            peer.load_piece(piece_num as usize).await?;
+            // send_interested(&mut connection).await;
+            // get_unchoke(&mut connection).await;
+            // let loaded_piece = load_piece(&mut connection, piece_num, &torrent).await;
+            // write_file(piece_path, &loaded_piece).await;
         }
         println!("I am here");
         Ok(())
     } else if command == "download" {
-        let torrent_path = &args[4];
-        let file_path = &args[3];
-        let torrent = Torrent::new(torrent_path);
-        let peers = torrent.get_peers().await;
-        let peer = peers.get(0).unwrap();
-        let mut connection = connect_peer(peer).await;
-        handshake(&mut connection, torrent.info_hash.clone()).await;
-        get_bitfield(&mut connection).await;
-        send_interested(&mut connection).await;
-        get_unchoke(&mut connection).await;
-        let pieces: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
-        let mut loaded_pieces: Vec<u8> = Vec::new();
-        for (i, _) in pieces.into_iter().enumerate() {
-            let mut piece = load_piece(&mut connection, i as i32, &torrent).await;
-            loaded_pieces.append(&mut piece);
-        }
-        write_file(file_path, &loaded_pieces).await;
+        // let torrent_path = &args[4];
+        // let file_path = &args[3];
+        // let torrent = Torrent::new(torrent_path);
+        // let peers = torrent.get_peers().await;
+        // let peer = peers.get(0).unwrap();
+        // let mut connection = connect_peer(peer).await;
+        // peer.handshake(&mut connection, torrent.info_hash.clone()).await;
+        // peer.get_bitfield(&mut connection).await;
+        // send_interested(&mut connection).await;
+        // get_unchoke(&mut connection).await;
+        // let pieces: Vec<&[u8]> = torrent.meta.info.pieces.as_ref().chunks(20).collect();
+        // let mut loaded_pieces: Vec<u8> = Vec::new();
+        // for (i, _) in pieces.into_iter().enumerate() {
+        //     let mut piece = load_piece(&mut connection, i as i32, &torrent).await;
+        //     loaded_pieces.append(&mut piece);
+        // }
+        // write_file(file_path, &loaded_pieces).await;
         Ok(())
     } else {
         println!("unknown command: {}", args[1]);

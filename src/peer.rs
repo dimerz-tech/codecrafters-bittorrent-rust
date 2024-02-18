@@ -1,46 +1,46 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::net::{Ipv4Addr};
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::str::FromStr;
+use clap::builder::TypedValueParser;
 use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use crate::piece::Piece;
 
 impl From<&[u8]> for Peer {
-    fn from(bytes: &[u8]) -> Self {
+    fn from(bytes: &[u8]) -> Peer {
         let ip = Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]);
         let port = u16::from_be_bytes([bytes[4], bytes[5]]);
-        Peer { ip, port, id: [0u8; 20], pieces: vec![], session: None}
+        let addr = SocketAddrV4::from_str(format!("{}:{}", ip, port).as_str()).unwrap();
+        Peer { addr, id: [0u8; 20], pieces: vec![], session: None }
     }
 }
 
 impl FromStr for Peer {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (ip, port) = s.split_once(":").unwrap();
-        let ip = Ipv4Addr::from_str(ip)?;
-        let port: u16 = port.parse().unwrap();
-        Ok(Peer { ip, port, id: [0u8; 20], pieces: vec![], session: None })
+        let addr = SocketAddrV4::from_str(s)?;
+        Ok(Peer { addr, id: [0u8; 20], pieces: vec![], session: None })
     }
 }
 
 impl Display for Peer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{}:{}", self.ip, self.port))
+        f.write_str(self.addr.to_string().as_str())
     }
 }
 
 pub struct Peer {
-    pub ip: Ipv4Addr,
-    pub port: u16,
+    pub addr: SocketAddrV4,
     pub id: [u8; 20],
     pub pieces: Vec<Piece>,
     pub session: Option<TcpStream>
 }
 
 impl Peer {
+
     pub async fn handshake(&mut self, info_hash: [u8; 20]) -> anyhow::Result<()> {
-        let mut stream = TcpStream::connect(format!("{}:{}", self.ip, self.port)).await?;
+        let mut stream = TcpStream::connect(self.addr).await?;
         stream.write_all(HandShake::new(info_hash).as_bytes_mut()).await?;
         let mut buf = [0u8; 68];
         stream.read_exact(&mut buf).await?;
@@ -48,6 +48,34 @@ impl Peer {
         println!("Peer ID: {}", hex::encode(peer_hello.peer_id));
         self.session = Some(stream);
         self.id = peer_hello.peer_id;
+        Ok(())
+    }
+
+
+    /* Smth like 100000001000000000000000 (size = X), where 1 - index (highest bit in byte) means
+    that client has this piece
+    bitfield: <len=0001+X><id=5><bitfield>
+    The bitfield message is variable length, where X is the length of the bitfield
+    */
+    async fn get_bitfield(&mut self) -> anyhow::Result<Vec<usize>> {
+        let mut len = [0u8; 4];
+        if let Some(mut session) = self.session.as_mut() {
+            session.read_exact(&mut len).await?;
+            let X = u32::from_be_bytes(len) - 1;
+            let mut id = 0u8;
+            session.read_exact(std::slice::from_mut(&mut id)).await?;
+            anyhow::ensure!(id == 5u8);
+            let mut bitfield = vec![0u8; X as usize];
+            session.read_exact(&mut bitfield).await?;
+            Ok(bitfield.into_iter().enumerate().filter(|(_, b)| b == &1u8).map(|(i, _)| i).collect::<Vec<usize>>())
+        } else {
+            Err(anyhow::format_err!("Connection to {} is not established", self.addr))
+        }
+    }
+
+    pub async fn load_piece(&mut self, piece_num: usize) -> anyhow::Result<()> {
+        let bitfield = self.get_bitfield().await?;
+        println!("Bitfields: {:?}", bitfield);
         Ok(())
     }
 }
@@ -96,7 +124,7 @@ impl From<[u8; 68]> for HandShake {
     }
 }
 
-// Communication between peers
+// All the remaining messages in the protocol take the form of <length prefix><message ID><payload>
 struct PeerMessage {
     // The length prefix is a four byte big-endian value
     pub prefix: i32,
@@ -105,3 +133,5 @@ struct PeerMessage {
     // The payload is message dependent.
     pub payload: Vec<u8>
 }
+
+
