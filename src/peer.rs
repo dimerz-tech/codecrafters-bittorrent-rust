@@ -52,7 +52,7 @@ impl Peer {
     }
 
 
-    /* Smth like 100000001000000000000000 (size = X), where 1 - index (highest bit in byte) means
+    /* Something like 100000001000000000000000 (size = X), where 1 - index (highest bit in byte) means
     that client has this piece
     bitfield: <len=0001+X><id=5><bitfield>
     The bitfield message is variable length, where X is the length of the bitfield
