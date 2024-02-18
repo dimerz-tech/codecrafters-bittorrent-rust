@@ -7,6 +7,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use crate::piece::Piece;
 
+pub struct Peer {
+    pub addr: SocketAddrV4,
+    pub id: [u8; 20],
+    pub pieces: Vec<Piece>,
+    pub session: Option<TcpStream>
+}
+
 impl From<&[u8]> for Peer {
     fn from(bytes: &[u8]) -> Peer {
         let ip = Ipv4Addr::new(bytes[0], bytes[1], bytes[2], bytes[3]);
@@ -28,13 +35,6 @@ impl Display for Peer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.addr.to_string().as_str())
     }
-}
-
-pub struct Peer {
-    pub addr: SocketAddrV4,
-    pub id: [u8; 20],
-    pub pieces: Vec<Piece>,
-    pub session: Option<TcpStream>
 }
 
 impl Peer {
